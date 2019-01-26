@@ -34,6 +34,7 @@ def showLogin():
 
 @app.route('/gconnect', methods=['POST'])
 def gconnect():
+    # First we check that the state parameter from login matches our request's.
     if request.args.get('state') != login_session['state']:
         response = make_response(json.dumps('Invalid state parameter.'), 401)
         response.headers['Cotent-Type'] = 'application/json'
@@ -57,6 +58,7 @@ def gconnect():
     h = httplib2.Http()
     result = json.loads(h.request(url, 'GET')[1])
 
+    # We need to check that our request doesn't return an error.
     if result.get('error') is not None:
         response = make_response(json.dumps(result.get('error')), 500)
         response.headers['Content-Type'] = 'application/json'
@@ -64,6 +66,7 @@ def gconnect():
 
     gplus_id = credentials.id_token['sub']
 
+    # And that our id_token and client_ids match our result's.
     if result['user_id'] != gplus_id:
         response = make_response(json.dumps(
             "Token's user ID doesn't match given user ID."), 401)
@@ -79,6 +82,7 @@ def gconnect():
     stored_access_token = login_session.get('access_token')
     stored_gplus_id = login_session.get('gplus_id')
 
+    # Here we check to see if the user is already signed in.
     if stored_access_token is not None and gplus_id == stored_gplus_id:
         response = make_response(json.dumps(
             'Current user is already connected'), 200)
@@ -88,12 +92,14 @@ def gconnect():
     login_session['access_token'] = credentials.access_token
     login_session['gplus_id'] = gplus_id
 
+    # We make a call for the user's information from google+
     userinfo_url = "https://www.googleapis.com/plus/v1/people/me"
     params = {'access_token': credentials.access_token, 'alt': 'json'}
     answer = requests.get(userinfo_url, params=params)
 
     data = answer.json()
 
+    # Store the information in our login_session.
     login_session['username'] = data['displayName']
     login_session['picture'] = data['image']['url']
     login_session['email'] = data['emails'][0]['value']
@@ -101,6 +107,10 @@ def gconnect():
     if login_session['username'] == '':
         login_session['username'] = login_session['email']
 
+    if getUserID(login_session['email']) is None:
+        createUser(login_session)
+
+    # And display a nice welcoming message.
     output = ''
     output += '<h1>Welcome, '
     output += login_session['username']
@@ -108,7 +118,7 @@ def gconnect():
     output += '<img src="'
     output += login_session['picture']
     output += ' " style = "width: 300px; height: 300px; border-radius: 150px;'
-    outpur += ' -webkit-border-radius: 150px; -moz-border-radius: 150px;">'
+    output += ' -webkit-border-radius: 150px; -moz-border-radius: 150px;">'
     flash("you are now logged in as %s" % login_session['username'])
     return output
 
@@ -195,8 +205,9 @@ def newSubject():
     if 'username' not in login_session:
         return redirect('/login')
     if request.method == 'POST':
+        user = getUserID(login_session['email'])
         newSubject = Subject(name=request.form['name'],
-                             user_id=login_session['id'])
+                             user_id=user)
         session.add(newSubject)
         flash('New Subject %s Successfully Created!' % newSubject.name)
         session.commit()
@@ -240,9 +251,13 @@ def deleteSubject(subject_id):
 @app.route('/subjects/<int:subject_id>/')
 @app.route('/subjects/<int:subject_id>/courses')
 def showCourses(subject_id):
+    user = -1
+    if 'username' in login_session:
+        user = getUserID(login_session['email'])
     subject = session.query(Subject).filter_by(id=subject_id).one()
     courses = session.query(Course).filter_by(subject_id=subject_id).all()
-    return render_template('courses.html', courses=courses, subject=subject)
+    return render_template('courses.html', courses=courses, subject=subject,
+                           user=user, check=subject.user_id)
 
 
 @app.route('/subjects/<int:subject_id>/courses/new/', methods=['GET', 'POST'])
@@ -253,9 +268,10 @@ def newCourse(subject_id):
     subject = session.query(Subject).filter_by(id=subject_id).one()
 
     if request.method == 'POST':
+        user = getUserID(login_session['email'])
         newCourse = Course(name=request.form['name'],
                            summary=request.form['summary'],
-                           subject_id=subject_id, user_id=subject.user_id)
+                           subject_id=subject_id, user_id=user)
         session.add(newCourse)
         session.commit()
         flash('New Course %s Successfully Created!' % (newCourse.name))
