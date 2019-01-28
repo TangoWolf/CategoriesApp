@@ -223,6 +223,14 @@ def editSubject(subject_id):
 
     editedSubject = session.query(Subject).filter_by(id=subject_id).one()
 
+    user = -1
+    if 'username' in login_session:
+        user = getUserID(login_session['email'])
+    if user != editedSubject.user_id:
+        return "<script>function securityFunction() {alert('You are not\
+               authorized to edit this subject. Please create your own subject\
+               in order to edit.');}</script><body onload='securityFunction'>"
+
     if request.method == 'POST':
         if request.form['name']:
             editedSubject.name = request.form['name']
@@ -238,6 +246,15 @@ def deleteSubject(subject_id):
         return redirect('/login')
 
     subjectToDelete = session.query(Subject).filter_by(id=subject_id).one()
+
+    user = -1
+    if 'username' in login_session:
+        user = getUserID(login_session['email'])
+    if user != subjectToDelete.user_id:
+        return "<script>function securityFunction() {alert('You are not\
+               authorized to delete this subject. Please create your own\
+               subject in order to delete.');}</script>\
+               <body onload='securityFunction'>"
 
     if request.method == 'POST':
         session.delete(subjectToDelete)
@@ -289,6 +306,14 @@ def editCourse(subject_id, course_id):
     editedCourse = session.query(Course).filter_by(id=course_id).one()
     subject = session.query(Subject).filter_by(id=subject_id).one()
 
+    user = -1
+    if 'username' in login_session:
+        user = getUserID(login_session['email'])
+    if user != editedCourse.user_id:
+        return "<script>function securityFunction() {alert('You are not\
+               authorized to edit this course. Please create your own course\
+               in order to edit.');}</script><body onload='securityFunction'>"
+
     if request.method == 'POST':
         if request.form['name']:
             editedCourse.name = request.form['name']
@@ -311,6 +336,15 @@ def deleteCourse(subject_id, course_id):
 
     subject = session.query(Subject).filter_by(id=subject_id).one()
     courseToDelete = session.query(Course).filter_by(id=course_id).one()
+
+    user = -1
+    if 'username' in login_session:
+        user = getUserID(login_session['email'])
+    if user != courseToDelete.user_id:
+        return "<script>function securityFunction() {alert('You are not\
+               authorized to delete this course. Please create your own course\
+               in order to delete.');}</script>\
+               <body onload='securityFunction'>"
 
     if request.method == 'POST':
         session.delete(courseToDelete)
